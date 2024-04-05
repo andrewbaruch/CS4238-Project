@@ -1,0 +1,69 @@
+\chapter{Task 1}
+\label{ch:task1}
+
+When a server recieves a \texttt{SYN} packet, it holds a bit of memory assuming that a client is trying to establish a session. It sends a \texttt{SYN/ACK} packet and waits for a response. \texttt{SYN flooding} works by sending multiple \texttt{SYN} packet to the server making it seem as if multiple clients are trying to establish a connection. Since the server has limited resources, the memory held by the server for these fake clients takes all of the available memory and the server cannot serve any more clients. Hence, when a legitimate user tries to establish connection, it doesn't work. This is an attack on availability. 
+
+Figure~\ref{fig:syn_backlog} shows we have 256 maximum \texttt{syn_backlog}
+
+% \begin{figure*}[t!]
+\begin{figure*}[h]
+\centering
+  \includegraphics[width=0.8\textwidth,keepaspectratio]{figures/SYN Backlog}
+  \caption{Size of \texttt{SYN} Backlog}
+\label{fig:syn_backlog}
+\end{figure*}
+
+Figure~\ref{fig:netstatna_noattack} shows the netstat with only 4 active connections. This is before the attack.
+
+% \begin{figure*}[t!]
+\begin{figure*}[h]
+\centering
+\includegraphics[width=0.8\textwidth,keepaspectratio]{figures/netstatna_noattack}
+  \caption{Size of \texttt{SYN} Backlog}
+\label{fig:netstatna_noattack}
+\end{figure*}
+
+
+Using the command \texttt{netwox 76 -i ~ip~ -p 80}, I started the attack, sending a flood of \texttt{TCP SYN} packets. Interestingly the source is obfuscated which I'm assuming is meant to make blocking it harder. Figure~\ref{fig:synflood} shows the command. And the wireshark.
+
+% \begin{figure*}[t!]
+\begin{figure*}[h]
+\centering
+  \includegraphics[width=0.8\textwidth,keepaspectratio]{figures/netwox-flood}
+  \caption{SYN Flood}
+\label{fig:synflood}
+\end{figure*}
+
+Interestingly, as shown by Figure~\ref{fig:netstatna_noattack}, the reply are not SYN/ACK but RST/ACK (reset). This means.. I got caught. It's refusing to make connection which makes me sad.
+
+% \begin{figure*}[t!]
+\begin{figure*}[h]
+\centering
+  \includegraphics[width=0.8\textwidth,keepaspectratio]{figures/RSTACK.png}
+  \caption{RST/ACk}
+\label{fig:rst_ack}
+\end{figure*}
+
+So, after messing with the network for a while and turning off my firewall, I ended up runnning it on docker. Nonetheless, it works as shown in Figure~\ref{fig:SYN_RECV}
+
+% \begin{figure*}[t!]
+  \begin{figure*}[h]
+    \centering
+      \includegraphics[width=0.8\textwidth,keepaspectratio]{figures/SYN_RECV.png}
+      \caption{SYN_RECV}
+    \label{fig:SYN_RECV}
+    \end{figure*}
+    
+When putting the \texttt{SYN Cookies} on and trying to do the attack again, I was surprised to see there is still a long list on the victim side. However, unlike before, connecting to telnet still works. Figure~\ref{fig:telnet} shows the successful connection first (\texttt{SYN Cookies turned on}), then it being turned off.
+
+After reading what it is, \texttt{SYN Cookie} essentially encoding the "stored information" from the browser to the \texttt{SYN-ACK} reply instead of keeping track of the \texttt{SYN} request itself. Essentially, the server and client's \texttt{ip} and \texttt{port} is hased. The current time, maximum segment size, and this hash is concatenated and becomes the random sequence number chosen by the server for \texttt{SYN-ACK}. As the \texttt{ACK} would definitely be this number + 1, when the server recieves it, it can check whether the request has expired, whether the \texttt{ip} and  \texttt{ip} of both matches, and takes the maximum segment size to reconstruct the \texttt{SYN} queue.
+
+Since the server doesn't need to store the request anymore, when it's flooded, it can still check whether the connection is legitimate even when it's memory is full. Hence, the \texttt{telnet} connection is recieved.
+
+% \begin{figure*}[t!]
+  \begin{figure*}[h]
+    \centering
+      \includegraphics[width=0.8\textwidth,keepaspectratio]{figures/user1_telnet}
+      \caption{telnet}
+    \label{fig:telnet}
+    \end{figure*}
